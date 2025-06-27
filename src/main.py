@@ -18,8 +18,8 @@ BLEU = (100, 150, 255)
 
 # Paramètres des raquettes
 RAQUETTE_LARGEUR = 15
-RAQUETTE_HAUTEUR = 70
-VITESSE_RAQUETTE = 7
+RAQUETTE_HAUTEUR = 140
+VITESSE_RAQUETTE = 10
 
 # Paramètres de la balle
 BALLE_TAILLE = 15
@@ -34,25 +34,22 @@ class Raquette:
         self.direction = 1  # 1 pour bas, -1 pour haut
 
     def deplacer(self, balle):
-        # Ajout d'un seuil pour éviter que la raquette ne suive la balle trop précisément
-        seuil = 20  # Espace mort autour du centre de la raquette
-
         # Déterminer si la balle est du côté de la raquette
         raquette_cote_gauche = self.rect.left < LARGEUR // 2
         balle_cote_gauche = balle.rect.centerx < LARGEUR // 2
 
         if raquette_cote_gauche == balle_cote_gauche:
             # Suivre la balle normalement
-            if balle.rect.centery < self.rect.centery - seuil:
+            if balle.rect.centery < self.rect.centery:
                 self.rect.y -= self.vitesse
-            elif balle.rect.centery > self.rect.centery + seuil:
+            elif balle.rect.centery > self.rect.centery:
                 self.rect.y += self.vitesse
         else:
             # Recentrer la raquette verticalement
             centre_ecran = HAUTEUR // 2
-            if self.rect.centery < centre_ecran - seuil:
+            if self.rect.centery < centre_ecran:
                 self.rect.y += self.vitesse
-            elif self.rect.centery > centre_ecran + seuil:
+            elif self.rect.centery > centre_ecran:
                 self.rect.y -= self.vitesse
 
         # Empêcher la raquette de sortir de l'écran
@@ -85,10 +82,18 @@ class Balle:
         if self.rect.top <= 0 or self.rect.bottom >= HAUTEUR:
             self.vitesse_y = -self.vitesse_y
 
-    def rebondir_raquette(self):
-        self.vitesse_x = -self.vitesse_x
-        # Ajouter un peu de variation à l'angle
-        self.vitesse_y += random.uniform(-5, 5)
+    def rebondir_raquette(self, raquette):
+        self.vitesse_x = -self.vitesse_x * 1.05
+        # Calculer l'écart entre le centre de la balle et le centre de la raquette
+        ecart = (
+            (self.rect.centery - raquette.rect.centery) / (RAQUETTE_HAUTEUR / 2) * 10
+        )
+        # Limiter l'écart entre -10 et 10
+        ecart = max(-10, min(10, ecart))
+        # Définir la vitesse Y en fonction de l'écart (plus éloigné du centre = plus rapide)
+        self.vitesse_y = ecart * 6
+        # Ajouter une petite variation aléatoire
+        self.vitesse_y += random.uniform(-1, 1)
         # Limiter la vitesse verticale
         self.vitesse_y = max(-6, min(6, self.vitesse_y))
 
@@ -175,10 +180,10 @@ def main():
         if not hasattr(main, "rebond_son"):
             main.rebond_son = pygame.mixer.Sound("sound/rebond.mp3")
         if balle.rect.colliderect(raquette_gauche.rect) and balle.vitesse_x < 0:
-            balle.rebondir_raquette()
+            balle.rebondir_raquette(raquette_gauche)
             main.rebond_son.play()
         elif balle.rect.colliderect(raquette_droite.rect) and balle.vitesse_x > 0:
-            balle.rebondir_raquette()
+            balle.rebondir_raquette(raquette_droite)
             main.rebond_son.play()
 
         # Vérifier si la balle sort de l'écran
@@ -209,28 +214,32 @@ def main():
         balle.dessiner(ecran)
         trace_balle.dessiner(ecran)
 
-        # Afficher le score
-        score_text = font.render(f"{score_gauche}  {score_droite}", True, BLANC)
+        question_text = font.render(
+            "Does she love you ?",
+            True,
+            BLANC,
+        )
+        question_rect = question_text.get_rect(center=(LARGEUR // 2, 20))
+        ecran.blit(question_text, question_rect)
+
+        answer_text = font.render("YES      NO", True, BLANC)
+        answer_rect = answer_text.get_rect(center=(LARGEUR // 2, 60))
+        ecran.blit(answer_text, answer_rect)
+
+        score_text = font.render(f"{score_gauche}    {score_droite}", True, BLANC)
+        score_rect = score_text.get_rect(center=(LARGEUR // 2, 80))
+        ecran.blit(score_text, score_rect)
+
         # Dessiner un rectangle blanc pour le fond de la vitesse
         vitesse_val = abs(balle.vitesse_x) + abs(balle.vitesse_y)
         vitesse_text = font.render(
-            f"Vitesse: {vitesse_val:.1f} km/h",
+            f"Vitesse: {vitesse_val * 3.2:.1f} km/h",
             True,
             NOIR,
         )
-        vitesse_rect = vitesse_text.get_rect(center=(LARGEUR // 2, 90))
-        pygame.draw.rect(ecran, BLANC, vitesse_rect.inflate(20, 10), border_radius=8)
+        vitesse_rect = vitesse_text.get_rect(center=(LARGEUR // 2, HAUTEUR - 50))
+        pygame.draw.rect(ecran, BLANC, vitesse_rect.inflate(20, 20), border_radius=8)
         ecran.blit(vitesse_text, vitesse_rect)
-        vitesse_rect = vitesse_text.get_rect(center=(LARGEUR // 2, 90))
-        ecran.blit(vitesse_text, vitesse_rect)
-        score_rect = score_text.get_rect(center=(LARGEUR // 2, 50))
-        ecran.blit(score_text, score_rect)
-
-        # Instructions
-        if score_gauche == 0 and score_droite == 0:
-            info_text = font.render("ESPACE: Nouvelle balle", True, BLANC)
-            info_rect = info_text.get_rect(center=(LARGEUR // 2, HAUTEUR - 50))
-            ecran.blit(info_text, info_rect)
 
         pygame.display.flip()
         horloge.tick(FPS)
